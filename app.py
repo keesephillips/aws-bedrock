@@ -1,7 +1,6 @@
-import os, json, html
+import os, json, html, time
 from flask import Flask, request, session, redirect, url_for, make_response
 import boto3
-import time
 
 REGION = os.getenv("AWS_REGION", "us-east-2")      
 PROMPT_ARN = os.getenv(
