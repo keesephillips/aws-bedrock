@@ -1,11 +1,8 @@
 version: 1.0
 runtime: python3
-# Optional: choose a specific minor version (e.g. python3.11)
 build:
   commands:
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
+    build:
+      - pip install -r requirements.txt
 run:
-  command: gunicorn -c gunicorn_conf.py my_app.main:app
-  network:
-    port: 8080 # App Runner will inject $PORT=8080
+  command: python app.py
