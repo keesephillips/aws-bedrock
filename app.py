@@ -1,13 +1,13 @@
-import os, json
-from flask import Flask, render_template, request, session, redirect, url_for
+import os, json, html
+from flask import Flask, render_template, request, session, redirect, url_for, make_response
 import boto3
 
 # ------------------------------------------------------------------
 # Configuration – read once at startup
 # ------------------------------------------------------------------
-REGION            = os.getenv("AWS_REGION", "us-east-2")          # Bedrock region
-PROMPT_ARN        = os.getenv("BEDROCK_PROMPT_ARN", "arn:aws:bedrock:us-east-2:381492212823:prompt/QSG8T98UZM")               # required!
-PROMPT_VAR_NAME   = os.getenv("PROMPT_VAR_NAME", "user_input")    # name inside {{ }} in your prompt
+REGION            = "us-east-2"#os.getenv("AWS_REGION", "us-east-2")          # Bedrock region
+PROMPT_ARN        = "arn:aws:bedrock:us-east-2:381492212823:prompt/QSG8T98UZM"#os.getenv("BEDROCK_PROMPT_ARN", "arn:aws:bedrock:us-east-2:381492212823:prompt/QSG8T98UZM")               # required!
+PROMPT_VAR_NAME   = "user_input"#os.getenv("PROMPT_VAR_NAME", "user_input")    # name inside {{ }} in your prompt
 if not PROMPT_ARN:
     raise RuntimeError("BEDROCK_PROMPT_ARN must be set")
 
@@ -17,7 +17,7 @@ bedrock = boto3.client("bedrock-runtime", region_name=REGION)
 # Flask application
 # ------------------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = "replace-with-a-secure-secret-key"
+app.secret_key = "2C8F2652583FBC2637D7090A175B18A1"
 
 HTML_SKELETON = """
 <!DOCTYPE html>
@@ -64,19 +64,20 @@ def index():
         if user_text:
             # store user turn
             session["conversation"].append({"role": "user", "text": user_text})
+            print(user_text)
 
-            # build Converse payload for prompt management
-            payload = {
-                "promptVariables": { PROMPT_VAR_NAME: { "text": user_text } }
-            }
             try:
+                print(user_text)
                 resp = bedrock.converse(
                     modelId=PROMPT_ARN,
-                    contentType="application/json",
-                    body=json.dumps(payload)
+                    promptVariables={ PROMPT_VAR_NAME: { "text": user_text } }
+                    # contentType="application/json",
+                    # body=json.dumps(payload)
                 )
+                print(resp)
                 assistant_text = resp["output"]["message"]["content"][0]["text"]
             except Exception as exc:
+                print(exc)
                 assistant_text = f"Error: {exc}"
 
             session["conversation"].append({"role": "assistant", "text": assistant_text})
