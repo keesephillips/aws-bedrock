@@ -1,54 +1,57 @@
+import os, json
 from flask import Flask, render_template, request, session, redirect, url_for
-import boto3, json, os
+import boto3
 
+# ------------------------------------------------------------------
+# Configuration – read once at startup
+# ------------------------------------------------------------------
+REGION            = os.getenv("AWS_REGION", "us-east-2")          # Bedrock region
+PROMPT_ARN        = os.getenv("BEDROCK_PROMPT_ARN", "arn:aws:bedrock:us-east-2:381492212823:prompt/QSG8T98UZM")               # required!
+PROMPT_VAR_NAME   = os.getenv("PROMPT_VAR_NAME", "user_input")    # name inside {{ }} in your prompt
+if not PROMPT_ARN:
+    raise RuntimeError("BEDROCK_PROMPT_ARN environment variable is required")
+
+bedrock = boto3.client("bedrock-runtime", region_name=REGION)
+
+# ------------------------------------------------------------------
+# Flask application
+# ------------------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = 'replace-with-a-secret-key'  # Needed for session data; use a secure key in production
+app.secret_key = "replace-with-a-secure-secret-key"
 
-# Route for the chatbot UI and interaction
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    # Initialize conversation history in session if not present
-    if 'conversation' not in session:
-        session['conversation'] = []
-    if request.method == 'POST':
-        user_message = request.form.get('message')
-        if user_message:
-            # Add the user's message to the conversation history
-            session['conversation'].append({'role': 'user', 'text': user_message})
-            # Prepare the payload for Claude (Anthropic via Bedrock)
-            messages_payload = [
-                {"role": msg['role'], "content": [{"type": "text", "text": msg['text']}]} 
-                for msg in session['conversation']
-            ]
+    # Initialise chat history once per browser session
+    if "conversation" not in session:
+        session["conversation"] = []
+
+    if request.method == "POST":
+        user_text = request.form.get("message", "").strip()
+        if user_text:
+            # ---- 1. store the user turn locally so we can display it
+            session["conversation"].append({"role": "user", "text": user_text})
+
+            # ---- 2. Build the Converse payload
             payload = {
-                "messages": messages_payload,
-                "max_tokens": 512,
-                "temperature": 0.5,
-                "anthropic_version": "bedrock-2023-05-31"
+                "promptVariables": {
+                    PROMPT_VAR_NAME: { "text": user_text }
+                }
+                # If you need multi-turn context *in addition* to the prompt
+                # template, you can append messages like this:
+                # "messages": [
+                #     { "role": m["role"],
+                #       "content": [ { "text": m["text"] } ] }
+                #     for m in session["conversation"]   # or some window
+                # ]
             }
-            # Invoke the Claude model via Amazon Bedrock
-            bedrock_client = boto3.client('bedrock-runtime', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
-            model_id = "anthropic.claude-v2"  # Claude model ID (adjust if using a different version)
+
             try:
-                response = bedrock_client.invoke_model(
-                    modelId=model_id,
+                response = bedrock.converse(
+                    modelId=PROMPT_ARN,
                     contentType="application/json",
                     body=json.dumps(payload)
                 )
-                # Read and decode the model's response
-                response_json = json.loads(response['body'].read().decode('utf-8'))
-                assistant_text = response_json["content"][0]["text"]
-            except Exception as e:
-                # Handle errors (e.g., permission or invocation errors)
-                assistant_text = f"Error: {e}"
-            # Add the model's answer to the conversation
-            session['conversation'].append({'role': 'assistant', 'text': assistant_text})
-        # Redirect to GET after POST (prevents form re-submission issues)
-        return redirect(url_for('index'))
-    # For GET requests, render the chat page with the conversation history
-    return render_template('index.html', conversation=session.get('conversation', []))
-
-if __name__ == '__main__':
-    # Use the PORT provided by App Runner (default to 8080 for local testing)
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+                # Converse returns structured JSON, no need to read a stream
+                assistant_text = response["output"]["message"]["content"][0]["text"]
+            except Exception as exc:
+                assistant_text = f"❌ Error: {exc}"
