@@ -1,16 +1,28 @@
 import os, json, html, time
 from flask import Flask, request, session, redirect, url_for, make_response
 import boto3
+from dotenv import load_dotenv, dotenv_values 
+load_dotenv() 
 
 REGION = os.getenv("AWS_REGION", "us-east-2")      
 PROMPT_ARN = os.getenv(
     "BEDROCK_PROMPT_ARN",
     "arn:aws:bedrock:us-east-2:381492212823:prompt/QSG8T98UZM"
 ) 
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+) 
+ACCESS_KEY = os.getenv(
+    "ACCESS_KEY",
+) 
 PROMPT_VAR_NAME = os.getenv("PROMPT_VAR_NAME", "user_input") 
 
-bedrock = boto3.client("bedrock-runtime", region_name=REGION)
-
+bedrock = boto3.client(
+    "bedrock-runtime",
+    region_name=REGION,
+    aws_access_key_id=ACCESS_KEY, 
+    aws_secret_access_key=SECRET_KEY,
+)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "8200E54A64AF2F8FFB509F99AFE8CF4C")  
@@ -63,7 +75,6 @@ def index():
                 resp = bedrock.converse(
                     modelId=PROMPT_ARN,
                     promptVariables={PROMPT_VAR_NAME: {"text": user_text}},
-                    inferenceConfig={"maxTokens": 1024},
                 )
 
                 assistant_text = resp["output"]["message"]["content"][0]["text"]
