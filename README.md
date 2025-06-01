@@ -30,5 +30,8 @@ Format the response using clear headers and bullet points
 ```
 *{{user_input}} is the variable which the user will use as the input in the frontend*
 
+# Demo
+[Demo Video](https://youtu.be/spfRu4GzEGQ)
+
 # Author
 Keese Phillips
